@@ -4,15 +4,7 @@
 
 A Neovim plugin that displays available actions like 'Go to Definition' and 'Go to Reference(s)' for the highlighted word, presented in the statusline or inline as virtual text.
 
-
-
-
-
-
-Available hints:
-
-- `⊛` - go-to-definition (`gd`) is available
-- `↱` reference list (`gr`) available / number of references
+Forked from [:zap: Action Hints](https://github.com/roobert/action-hints.nvim)
 
 ## Installation
 
@@ -33,8 +25,8 @@ Available hints:
   config = function()
     require("action-hints").setup({
       template = {
-        definition = { text = " ⊛", color = "#add8e6" },
-        references = { text = " ↱%s", color = "#ff6666" },
+        definition = { text = " ", color = "#add8e6" },
+        references = { text = " %s", color = "#ffade6"},
       },
       use_virtual_text = true,
     })
@@ -53,3 +45,9 @@ require("lualine").setup({
   },
 })
 ```
+
+## Changes
+
+1. Do not use plugins in insert mode
+2. Use the command `:ChangeActionHints` to change the global plugin state(shortcut `<leader>aa`)
+
