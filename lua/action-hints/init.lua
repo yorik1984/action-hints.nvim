@@ -79,7 +79,11 @@ local function set_virtual_text(bufnr, line, chunks)
 	end
 
 	-- Set the virtual text for the current line
-	vim.api.nvim_buf_set_virtual_text(bufnr, references_namespace, line, virtual_text_chunks, {})
+	-- vim.api.nvim_buf_set_virtual_text(bufnr, references_namespace, line, virtual_text_chunks, {})
+	vim.api.nvim_buf_set_extmark(bufnr, references_namespace, line, 0, {
+		virt_text = virtual_text_chunks,
+		virt_text_pos = "eol",
+	})
 	last_virtual_text_line = line
 end
 
@@ -263,9 +267,9 @@ M.setup = function(options)
 			M.config[k] = v
 		end
 		vim.api.nvim_command(
-			[[autocmd CursorMoved * if index(['n', 'v', 'V'], mode()) >= 0 | lua require("action-hints").update() | endif]]
+			[[autocmd CursorMoved * lua if vim.fn.index({'n', 'v', 'V'}, vim.api.nvim_get_mode().mode) >= 0 then require('action-hints').update() end]]
 		)
-		vim.api.nvim_command([[autocmd CursorMovedI * lua require("action-hints").clear_virtual_text()]])
+		vim.api.nvim_command([[autocmd CursorMovedI * lua require('action-hints').clear_virtual_text()]])
 	end
 
 	M.set_highlight()
