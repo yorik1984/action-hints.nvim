@@ -279,14 +279,14 @@ M.setup = function(options)
 	vim.api.nvim_command([[autocmd CursorMovedI * lua require("action-hints").update()]])
 end
 
-vim.api.nvim_create_user_command("EnableActionHints", function()
-	M.is_enabled = true
-	M.update()
-end, {})
-
-vim.api.nvim_create_user_command("DisableActionHints", function()
-	M.is_enabled = false
-	M.clear_virtual_text()
+vim.api.nvim_create_user_command("ChangeActionHintsStat", function()
+	if M.is_enabled then
+		M.is_enabled = false
+		M.clear_virtual_text()
+	else
+		M.is_enabled = true
+		M.update()
+	end
 end, {})
 
 return M
