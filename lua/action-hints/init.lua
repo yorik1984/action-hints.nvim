@@ -6,7 +6,7 @@ local default_references_color
 
 if vim.o.termguicolors then
 	default_definition_color = "#add8e6"
-	default_references_color = "#ff6666"
+	default_references_color = "#ffade6"
 else
 	default_definition_color = "blue"
 	default_references_color = "red"
@@ -14,8 +14,8 @@ end
 
 M.config = {
 	template = {
-		definition = { text = " ⊛", color = default_definition_color },
-		references = { text = " ↱%s", color = default_references_color },
+		definition = { text = " ", color = default_definition_color },
+		references = { text = " %s", color = default_references_color },
 	},
 	use_virtual_text = false,
 }
@@ -41,7 +41,7 @@ local function debounce(func, delay)
 end
 
 M.supports_method = function(method)
-	local clients = vim.lsp.buf_get_clients()
+	local clients = vim.lsp.get_active_clients()
 	for _, client in pairs(clients) do
 		if client.server_capabilities[method] then
 			return true
@@ -207,7 +207,7 @@ local debounced_definition = debounce(definition, 100)
 M.update = function()
 	if M.is_enabled then
 		local mode = vim.api.nvim_get_mode().mode
-		if mode == "n" or mode == "v" or mode == "V" then
+		if mode == "n" or mode == "v" or mode == "V" or mode == "\22" then
 			debounced_references()
 			debounced_definition()
 		else
@@ -267,7 +267,7 @@ M.setup = function(options)
 			M.config[k] = v
 		end
 		vim.api.nvim_command(
-			[[autocmd CursorMoved * lua if vim.fn.index({'n', 'v', 'V'}, vim.api.nvim_get_mode().mode) >= 0 then require('action-hints').update() end]]
+			[[autocmd CursorMoved * lua if vim.fn.index({'n', 'v', 'V','\22'}, vim.api.nvim_get_mode().mode) >= 0 then require('action-hints').update() end]]
 		)
 		vim.api.nvim_command([[autocmd CursorMovedI * lua require('action-hints').clear_virtual_text()]])
 	end
