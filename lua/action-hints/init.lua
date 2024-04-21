@@ -203,7 +203,7 @@ local debounced_definition = debounce(definition, 100)
 M.update = function()
 	if M.is_enabled then
 		local mode = vim.api.nvim_get_mode().mode
-		if mode == "n" or mode == "v" or mode == "V" or mode == "" then
+		if mode == "n" or mode == "v" or mode == "V" then
 			debounced_references()
 			debounced_definition()
 		else
@@ -263,7 +263,7 @@ M.setup = function(options)
 			M.config[k] = v
 		end
 		vim.api.nvim_command(
-			[[autocmd CursorMoved * if index(['n', 'v', 'V', '^V'], mode()) >= 0 | lua require("action-hints").update() | endif]]
+			[[autocmd CursorMoved * if index(['n', 'v', 'V'], mode()) >= 0 | lua require("action-hints").update() | endif]]
 		)
 		vim.api.nvim_command([[autocmd CursorMovedI * lua require("action-hints").clear_virtual_text()]])
 	end
