@@ -288,5 +288,5 @@ vim.api.nvim_create_user_command("ChangeActionHintsStat", function()
 		M.update()
 	end
 end, {})
-
+vim.api.nvim_set_keymap("n", "<leader>ah", ":ChangeActionHintsStat<CR>", { noremap = true })
 return M
