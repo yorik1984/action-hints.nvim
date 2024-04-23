@@ -14,7 +14,7 @@ end
 
 M.config = {
 	template = {
-		definition = { text = " ", color = default_definition_color },
+		definition = { text = " %s", color = default_definition_color },
 		references = { text = " %s", color = default_references_color },
 	},
 	use_virtual_text = false,
@@ -23,6 +23,7 @@ M.config = {
 M.references_available = false
 M.reference_count = 0
 M.definition_available = false
+M.definition_count = 0
 
 local references_namespace = vim.api.nvim_create_namespace("action_hints_references")
 local last_virtual_text_line = nil
@@ -91,7 +92,9 @@ local function update_virtual_text()
 	if M.config.use_virtual_text then
 		local bufnr = vim.api.nvim_get_current_buf()
 		local cursor = vim.api.nvim_win_get_cursor(0)
-		local definition_status = M.definition_available and M.config.template.definition.text or ""
+		local definition_status = M.definition_count > 0
+				and string.format(M.config.template.definition.text, tostring(M.definition_count))
+			or ""
 		local reference_status = M.reference_count > 0
 				and string.format(M.config.template.references.text, tostring(M.reference_count))
 			or ""
@@ -173,18 +176,21 @@ local function definition()
 	vim.lsp.buf_request(bufnr, "textDocument/definition", params, function(err, result, _, _)
 		if err or not result then
 			M.definition_available = false
+			M.definition_count = 0
 			M.clear_virtual_text()
 			return
 		end
 
 		if vim.tbl_count(result) > 0 then
 			M.definition_available = true
+			M.definition_count = vim.tbl_count(result)
 			update_virtual_text()
 			return
 		end
 
 		M.clear_virtual_text()
 		M.definition_available = false
+		M.definition_count = 0
 	end)
 end
 
@@ -217,7 +223,9 @@ M.update = function()
 end
 
 M.statusline = function()
-	local definition_status = M.definition_available and M.config.template.definition.text or ""
+	local definition_status = M.definition_count > 0
+			and string.format(M.config.template.definition.text, tostring(M.definition_count))
+		or ""
 	local reference_status = M.reference_count > 0
 			and string.format(M.config.template.references.text, tostring(M.reference_count))
 		or ""
