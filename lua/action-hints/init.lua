@@ -41,10 +41,11 @@ local function debounce(func, delay)
 	end
 end
 
+-- Check if LSP supports a specific method for active buffer
 M.supports_method = function(method)
-	local clients = vim.lsp.get_active_clients()
-	for _, client in pairs(clients) do
-		if client.server_capabilities[method] then
+	local clients = vim.lsp.get_clients({ bufnr = vim.api.nvim_get_current_buf() })
+	for _, client in ipairs(clients) do
+		if client.supports_method and client:supports_method(method) then
 			return true
 		end
 	end
@@ -116,7 +117,7 @@ local function is_cursor_on_whitespace()
 end
 
 local function references()
-	if not M.supports_method("referencesProvider") then
+	if not M.supports_method("textDocument/references") then
 		return
 	end
 
@@ -156,7 +157,7 @@ local function references()
 end
 
 local function definition()
-	if not M.supports_method("definitionProvider") then
+	if not M.supports_method("textDocument/definition") then
 		return
 	end
 
