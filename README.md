@@ -45,6 +45,16 @@ require("lualine").setup({
   },
 })
 ```
+##  Commands
+
+`:ChangeActionHintsStat` 
+
+Optionaly add user keymap:
+```lua
+vim.keymap.set("n", "<leader>aa", ":ChangeActionHintsStat<CR>", { noremap = true })
+```
+
+
 
 ## Changes
 
