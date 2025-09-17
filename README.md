@@ -21,16 +21,16 @@ Forked from [:zap: Action Hints](https://github.com/roobert/action-hints.nvim)
 
 ```lua
 {
-  "roobert/action-hints.nvim",
-  config = function()
-    require("action-hints").setup({
-      template = {
-        definition = { text = " ", color = "#add8e6" },
-        references = { text = " %s", color = "#ffade6"},
-      },
-      use_virtual_text = true,
-    })
-  end,
+    "roobert/action-hints.nvim",
+    config = function()
+        require("action-hints").setup({
+            template = {
+                definition = { text = " ", color = "#add8e6" },
+                references = { text = " %s", color = "#ffade6"},
+            },
+            use_virtual_text = true,
+        })
+    end,
 },
 ```
 
@@ -40,14 +40,15 @@ As a lualine component:
 
 ```lua
 require("lualine").setup({
-  sections = {
-    lualine_x = { require("action-hints").statusline },
-  },
+    sections = {
+        lualine_x = { require("action-hints").statusline },
+    },
 })
 ```
-##  Commands
 
-`:ChangeActionHintsStat` 
+| Command                 | Description                    |
+| ----------------------- | ------------------------------ |
+|`:ChangeActionHintsStat` | Change the global plugin state |
 
 Optionaly add user keymap:
 ```lua
@@ -58,6 +59,5 @@ vim.keymap.set("n", "<leader>aa", ":ChangeActionHintsStat<CR>", { noremap = true
 
 ## Changes
 
-1. Do not use plugins in insert mode
-2. Use the command `:ChangeActionHints` to change the global plugin state(shortcut `<leader>aa`)
+1. Do not use plugins in insert mode.
 
