@@ -68,16 +68,16 @@ M.set_highlight = function(config)
 
     local def = template.definition or {}
     if def.color then
-        vim.api.nvim_set_hl(0, "ActionHintsDefinition", { fg = def.color })
+        vim.api.nvim_set_hl(0, "ActionHintsDefinition", { fg = def.color, default = true })
     else
-        vim.api.nvim_set_hl(0, "ActionHintsDefinition", { link = def.link })
+        vim.api.nvim_set_hl(0, "ActionHintsDefinition", { link = def.link, default = true })
     end
 
     local ref = template.references or {}
     if ref.color then
-        vim.api.nvim_set_hl(0, "ActionHintsReferences", { fg = ref.color })
+        vim.api.nvim_set_hl(0, "ActionHintsReferences", { fg = ref.color, default = true })
     else
-        vim.api.nvim_set_hl(0, "ActionHintsReferences", { link = ref.link })
+        vim.api.nvim_set_hl(0, "ActionHintsReferences", { link = ref.link, default = true })
     end
 
     local statusline_colored = (config and config.statusline_colored ~= nil)
