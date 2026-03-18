@@ -1,3 +1,7 @@
+<a href="https://dotfyle.com/plugins/yorik1984/action-hints.nvim">
+	<img src="https://dotfyle.com/plugins/yorik1984/action-hints.nvim/shield?style=flat" />
+</a>
+
 # ⚡️ Action Hints
 
 ![action-hints Screenshot](https://raw.githubusercontent.com/new-paper/newpaper/main/assets/previews/nvim/plugins/action-hints/action-hints.gif)
