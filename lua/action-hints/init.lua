@@ -3,6 +3,14 @@ local M = {}
 M.is_enabled = true
 M.statusline_enabled = true
 
+local H = {}
+H.ranges = {}
+H.current_range = {}
+H.request_id = 0
+H.bufnr = vim.api.nvim_get_current_buf()
+H.cancel_fn = nil
+H.ns_id = vim.api.nvim_create_namespace("action_hints_highlight")
+
 --- Get the foreground color of a highlight group as a hex string.
 --- Uses vim.api.nvim_get_hl wrapped in pcall to avoid hard errors.
 --- @param group_name string Name of the highlight group (e.g. "Typedef")
@@ -80,8 +88,10 @@ M.set_highlight = function(config)
         vim.api.nvim_set_hl(0, "ActionHintsReferences", { link = ref.link, default = true })
     end
 
-    local statusline_colored = (config and config.statusline_colored ~= nil)
-        and config.statusline_colored or M.config.statusline_colored
+    vim.api.nvim_set_hl(0, "ActionHintsHighlight", { link = "ActionHintsDefinition", default = true })
+
+    local statusline_colored = (config and config.statusline_colored ~= nil) and config.statusline_colored
+        or M.config.statusline_colored
 
     if statusline_colored then
         vim.api.nvim_set_hl(0, "ActionHintsDefinitionStatusLine", { link = "ActionHintsDefinition" })
@@ -104,8 +114,6 @@ M.definition_count = 0
 local references_namespace = vim.api.nvim_create_namespace("action_hints_references")
 local last_virtual_text_line = nil
 
--- Debounce implementation using libuv timer (vim.loop).
--- Assumes vim.loop is available.
 local function debounce(func, delay_ms)
     local timer = nil
     return function(...)
@@ -113,17 +121,11 @@ local function debounce(func, delay_ms)
         if timer then
             timer:stop()
             timer:close()
-            timer = nil
         end
-        timer = vim.loop.new_timer()
-        timer:start(delay_ms, 0, function()
-            timer:stop()
-            timer:close()
+        timer = vim.defer_fn(function()
             timer = nil
-            vim.schedule(function()
-                func(unpack(args))
-            end)
-        end)
+            func(unpack(args))
+        end, delay_ms)
     end
 end
 
@@ -182,6 +184,137 @@ M.is_ignored = function(bufnr)
     return false
 end
 
+---update id for version control
+---@param id integer
+---@return integer
+local function update_id(id)
+    if id == 1e9 then
+        id = 0
+    end
+    id = id + 1
+    return id
+end
+
+---check if the position is in the range
+---@param pos table<integer> Position { line, col } (0-indexed)
+---@param range { start: { line: integer, character: integer }, ["end"]: { line: integer, character: integer } } LSP range object
+---@return boolean true if position is inside the range
+local function is_in_range(pos, range)
+    if vim.tbl_isempty(range) then
+        return false
+    end
+    local line, col = pos[1], pos[2]
+    if line < range.start.line or line > range["end"].line then
+        return false
+    elseif line == range.start.line and col < range["start"].character then
+        return false
+    elseif line == range["end"].line and col > range["end"].character then
+        return false
+    end
+    return true
+end
+
+---check if the position is in any ranges
+---@param pos table<integer>
+---@param ranges table
+---@return boolean
+local function is_in_any_range(pos, ranges)
+    if not vim.tbl_isempty(H.current_range) and is_in_range(pos, H.current_range.range) then
+        return true
+    else
+        for _, range in ipairs(ranges) do
+            if is_in_range(pos, range.range) then
+                H.current_range = range
+                return true
+            end
+        end
+        return false
+    end
+end
+
+---@return table
+local function get_cursor_pos()
+    local pos = vim.api.nvim_win_get_cursor(0)
+    -- the pos is (1,0)-indexed
+    return { pos[1] - 1, pos[2] }
+end
+
+---highlight the ranges
+---@param bufnr integer
+---@param ranges table
+local function apply_highlight(bufnr, ranges)
+    for _, range in ipairs(ranges) do
+        vim.api.nvim_buf_set_extmark(
+            bufnr,
+            H.ns_id,
+            range["range"]["start"]["line"],
+            range["range"]["start"]["character"],
+            {
+                end_line = range["range"]["end"]["line"],
+                end_col = range["range"]["end"]["character"],
+                hl_group = "ActionHintsHighlight",
+            }
+        )
+    end
+end
+
+---clear current highlights
+---@param bufnr integer
+local function clear_highlight(bufnr)
+    if vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_clear_namespace(bufnr, H.ns_id, 0, -1)
+    end
+    H.ranges = {}
+    H.current_range = {}
+end
+
+---the core implementation
+---@param bufnr integer
+---@param id integer
+local function request_highlight(bufnr, id)
+    local method = "textDocument/documentHighlight"
+    if not M.supports_method(method, bufnr) then
+        return
+    end
+
+    if H.cancel_fn ~= nil then
+        pcall(H.cancel_fn)
+    end
+
+    local winid = vim.api.nvim_get_current_win()
+    local clients = vim.lsp.get_clients({ bufnr = bufnr, method = method })
+
+    if #clients == 0 then
+        return
+    end
+
+    local params = function(client)
+        return vim.lsp.util.make_position_params(winid, client.offset_encoding)
+    end
+
+    local cancel_fn = vim.lsp.buf_request_all(bufnr, method, params, function(results)
+        if bufnr ~= H.bufnr or H.request_id ~= id then
+            return
+        end
+
+        local ranges = {}
+        for _, resultObj in pairs(results) do
+            local result = resultObj["result"]
+            if result == nil then
+                return
+            end
+            for _, res in ipairs(result) do
+                table.insert(ranges, res)
+            end
+        end
+        H.ranges = ranges
+
+        apply_highlight(bufnr, H.ranges)
+    end)
+
+    H.cancel_fn = cancel_fn
+end
+
 local function set_virtual_text(bufnr, line, chunks)
     if not vim.api.nvim_buf_is_valid(bufnr) then
         last_virtual_text_line = nil
@@ -208,14 +341,18 @@ local function set_virtual_text(bufnr, line, chunks)
 
     local virtual_text_chunks = {}
     for _, chunk in ipairs(chunks) do
-        table.insert(virtual_text_chunks, { chunk[1], chunk[2] })
+        if chunk[1] ~= "" then
+            table.insert(virtual_text_chunks, { chunk[1], chunk[2] })
+        end
     end
 
-    vim.api.nvim_buf_set_extmark(bufnr, references_namespace, line, 0, {
-        virt_text = virtual_text_chunks,
-        virt_text_pos = "eol",
-    })
-    last_virtual_text_line = line
+    if #virtual_text_chunks > 0 then
+        vim.api.nvim_buf_set_extmark(bufnr, references_namespace, line, 0, {
+            virt_text = virtual_text_chunks,
+            virt_text_pos = "eol",
+        })
+        last_virtual_text_line = line
+    end
 end
 
 local function update_virtual_text(bufnr)
@@ -253,7 +390,7 @@ local function is_cursor_on_whitespace()
 end
 
 -- forward declarations for debounced wrappers
-local debounced_references, debounced_definition
+local debounced_references, debounced_definition, debounced_highlight
 
 local function references()
     local bufnr = vim.api.nvim_get_current_buf()
@@ -268,7 +405,6 @@ local function references()
         return
     end
 
-    -- use supported API to get cursor position
     local cursor = vim.api.nvim_win_get_cursor(0)
     local bufname = vim.uri_from_bufnr(bufnr)
 
@@ -311,7 +447,6 @@ local function definition()
         return
     end
 
-    -- use supported API to get cursor position
     local cursor = vim.api.nvim_win_get_cursor(0)
     local bufname = vim.uri_from_bufnr(bufnr)
 
@@ -341,9 +476,30 @@ local function definition()
     end)
 end
 
+local function highlight()
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    if M.is_ignored(bufnr) then
+        return
+    end
+
+    if not vim.tbl_isempty(H.ranges) then
+        if is_in_any_range(get_cursor_pos(), H.ranges) then
+            return
+        else
+            clear_highlight(H.bufnr)
+        end
+    end
+
+    H.bufnr = bufnr
+    H.request_id = update_id(H.request_id)
+    request_highlight(bufnr, H.request_id)
+end
+
 -- assign debounced wrappers after functions are defined
 debounced_references = debounce(references, 100)
 debounced_definition = debounce(definition, 100)
+debounced_highlight = debounce(highlight, 50)
 
 M.clear_virtual_text = function()
     local bufnr = vim.api.nvim_get_current_buf()
@@ -367,8 +523,10 @@ M.update = function()
     if mode == "n" or mode == "v" or mode == "V" or mode == "\22" then
         debounced_references()
         debounced_definition()
+        debounced_highlight()
     else
         M.clear_virtual_text()
+        clear_highlight(vim.api.nvim_get_current_buf())
     end
 end
 
@@ -405,7 +563,9 @@ end
 
 -- Merge helper for template tables (shallow merge for two levels)
 local function merge_template(dst, src)
-    if not src then return end
+    if not src then
+        return
+    end
     for k, v in pairs(src) do
         if type(v) == "table" and type(dst[k]) == "table" then
             for k2, v2 in pairs(v) do
@@ -445,7 +605,15 @@ M.setup = function(options)
             else
                 -- CursorMovedI
                 M.clear_virtual_text()
+                clear_highlight(vim.api.nvim_get_current_buf())
             end
+        end,
+    })
+
+    vim.api.nvim_create_autocmd("BufLeave", {
+        group = aug,
+        callback = function()
+            clear_highlight(vim.api.nvim_get_current_buf())
         end,
     })
 
@@ -468,6 +636,7 @@ vim.api.nvim_create_user_command("ChangeActionHintsStat", function()
         M.is_enabled = false
         M.statusline_enabled = false
         M.clear_virtual_text()
+        clear_highlight(vim.api.nvim_get_current_buf())
     else
         M.is_enabled = true
         M.statusline_enabled = true

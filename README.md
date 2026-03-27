@@ -35,6 +35,7 @@ Install via your favorite package manager:
 ## 🔧 Quick configuration reference
 
 #### Default (important fields)
+
 ```lua
 ---@class ActionHintsTemplateEntry
 ---@field text string
@@ -91,6 +92,7 @@ Install via your favorite package manager:
 
 - Force a color:
   - `template.definition.color = "#AF0000"` → plugin applies `fg = "#AF0000"` and respects it across theme changes.
+
 ```lua
 {
     template = {
@@ -107,6 +109,7 @@ Install via your favorite package manager:
 
 - Theme-controlled (recommended default):
   - `template.definition.color = nil; template.definition.link = "Typedef"` → plugin links to `"Typedef"`, so the colorscheme decides the color.
+
 ```lua
 {
     template = {
@@ -119,6 +122,7 @@ Install via your favorite package manager:
     },
 }
 ```
+
 - Ignored:
     - `ignored` field accepts Lua patterns (not shell globs). Patterns are matched against file paths (relative or absolute) — use `^` / `$` anchors, `.` and `*` for "any char" / "repeat", and escape special characters with `%` (e.g. `.` → `%.`).
 
@@ -135,15 +139,28 @@ Install via your favorite package manager:
 
 ## 🚀 Lualine status
 
-Lualine and other statusline frameworks will respect these markers and apply the highlight groups accordingly.
+[Lualine](https://github.com/nvim-lualine/lualine.nvim) and other statusline frameworks will respect these markers and apply the highlight groups accordingly.
 As a lualine component:
 
+**[lazy.nvim](https://github.com/folke/lazy.nvim)**
+
 ```lua
-require("lualine").setup({
-    sections = {
-        lualine_x = { require("action-hints").statusline },
+{
+    "nvim-lualine/lualine.nvim",
+    dependencies = {
+        {
+            "yorik1984/action-hints.nvim",
+            opts = {},
+        },
     },
-})
+    opts = {
+        sections = {
+            lualine_x = { require("action-hints").statusline },
+        },
+        -- other settings
+        ...
+    },
+}
 ```
 
 ## Commands
@@ -158,7 +175,7 @@ Optionally add user keymap:
 vim.keymap.set("n", "<leader>aa", ":ChangeActionHintsStat<CR>", { noremap = true })
 ```
 
-## 🎨✨ Highlight groups
+## 🎨 Highlight groups
 
 Quick reference for the highlight groups used by the plugin.
 
@@ -211,11 +228,18 @@ vim.api.nvim_set_hl(0, "ActionHintsReferences", { fg = require("action-hints").g
 
 > [!tip]
 > To make the icons and the words use the same highlighting(like in screenshot), configure your colorscheme so those highlight groups use the same colors. For example:
+
 ```lua
 vim.api.nvim_set_hl(0, "LspReferenceRead",  { link = "ActionHintsReferences", default = false })
 vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "ActionHintsDefinition", default = false })
 ```
 
+## 🔗 Similar Projects
+
+- [doc-highlight.nvim](https://github.com/allworldg/doc-highlight) – A neovim plugin for LSP Document Highlight
+
 ## ©️ Credits
+ 
 - [roobert/action-hints.nvim](https://github.com/roobert/action-hints.nvim)(original)
 - [lgh597/action-hints.nvim](https://github.com/lgh597/action-hints.nvim)
+- [doc-highlight.nvim](https://github.com/allworldg/doc-highlight) The document highlight implementation in this plugin is based on the excellent work from  by [allworldg](https://github.com/allworldg). The logic for preserving highlights during cursor movement within ranges was adapted from that project. Special thanks to the author for creating a clean, minimal implementation that served as inspiration for this feature.
