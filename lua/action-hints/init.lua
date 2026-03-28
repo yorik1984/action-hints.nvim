@@ -104,8 +104,6 @@ M.definition_count = 0
 local references_namespace = vim.api.nvim_create_namespace("action_hints_references")
 local last_virtual_text_line = nil
 
--- Debounce implementation using libuv timer (vim.loop).
--- Assumes vim.loop is available.
 local function debounce(func, delay_ms)
     local timer = nil
     return function(...)
@@ -113,17 +111,11 @@ local function debounce(func, delay_ms)
         if timer then
             timer:stop()
             timer:close()
-            timer = nil
         end
-        timer = vim.loop.new_timer()
-        timer:start(delay_ms, 0, function()
-            timer:stop()
-            timer:close()
+        timer = vim.defer_fn(function()
             timer = nil
-            vim.schedule(function()
-                func(unpack(args))
-            end)
-        end)
+            func(unpack(args))
+        end, delay_ms)
     end
 end
 
