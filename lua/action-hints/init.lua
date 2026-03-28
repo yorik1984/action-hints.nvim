@@ -2,7 +2,7 @@ local M = {}
 
 M.is_enabled         = true
 M.statusline_enabled = true
-M.UPDATE_TIME        = 50
+M.UPDATE_TIME        = 100
 
 --- Get the foreground color of a highlight group as a hex string.
 --- Uses vim.api.nvim_get_hl wrapped in pcall to avoid hard errors.
