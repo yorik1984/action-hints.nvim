@@ -1,7 +1,8 @@
 local M = {}
 
-M.is_enabled = true
+M.is_enabled         = true
 M.statusline_enabled = true
+M.UPDATE_TIME        = 50
 
 --- Get the foreground color of a highlight group as a hex string.
 --- Uses vim.api.nvim_get_hl wrapped in pcall to avoid hard errors.
@@ -30,7 +31,7 @@ end
 
 ---@class ActionHintsTemplateEntry
 ---@field text string
----@field color string|nil
+---@field color string|function|nil
 ---@field link string|nil
 
 ---@class ActionHintsConfigTemplate
@@ -48,12 +49,12 @@ M.config = {
     template = {
         definition = {
             text = " ⊛%s",
-            color = nil,
+            color = M.get_fg_color("LspReferenceWrite"),
             link = "Typedef",
         },
         references = {
             text = " ↱%s",
-            color = nil,
+            color = M.get_fg_color("LspReferenceRead"),
             link = "Type",
         },
     },
@@ -67,13 +68,13 @@ M.set_highlight = function(config)
     local template = cfg.template or {}
 
     local def = template.definition or {}
+    local ref = template.references or {}
     if def.color then
         vim.api.nvim_set_hl(0, "ActionHintsDefinition", { fg = def.color, default = true })
     else
         vim.api.nvim_set_hl(0, "ActionHintsDefinition", { link = def.link, default = true })
     end
 
-    local ref = template.references or {}
     if ref.color then
         vim.api.nvim_set_hl(0, "ActionHintsReferences", { fg = ref.color, default = true })
     else
@@ -94,10 +95,13 @@ end
 
 ---@type boolean
 M.references_available = false
+
 ---@type integer
 M.reference_count = 0
+
 ---@type boolean
 M.definition_available = false
+
 ---@type integer
 M.definition_count = 0
 
@@ -334,8 +338,8 @@ local function definition()
 end
 
 -- assign debounced wrappers after functions are defined
-debounced_references = debounce(references, 100)
-debounced_definition = debounce(definition, 100)
+debounced_references = debounce(references, M.UPDATE_TIME)
+debounced_definition = debounce(definition, M.UPDATE_TIME)
 
 M.clear_virtual_text = function()
     local bufnr = vim.api.nvim_get_current_buf()
@@ -350,13 +354,17 @@ M.clear_virtual_text = function()
     end
 end
 
+local function is_normal_mode()
+    local mode = vim.api.nvim_get_mode().mode
+    return vim.tbl_contains({ "n", "v", "V", "\22" }, mode)
+end
+
 M.update = function()
     if not M.is_enabled then
         return
     end
 
-    local mode = vim.api.nvim_get_mode().mode
-    if mode == "n" or mode == "v" or mode == "V" or mode == "\22" then
+    if is_normal_mode() then
         debounced_references()
         debounced_definition()
     else
@@ -426,19 +434,14 @@ M.setup = function(options)
     M.set_highlight(M.config)
 
     -- Create autocommands once, callbacks use M directly (no extra require)
-    vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+    vim.api.nvim_create_autocmd("CursorMoved", {
         group = aug,
-        callback = function(evt)
-            if evt.event == "CursorMoved" then
-                local mode = vim.api.nvim_get_mode().mode
-                if vim.tbl_contains({ "n", "v", "V", "\22" }, mode) then
-                    M.update()
-                end
-            else
-                -- CursorMovedI
-                M.clear_virtual_text()
-            end
-        end,
+        callback = M.update,
+    })
+
+    vim.api.nvim_create_autocmd("CursorMovedI", {
+        group = aug,
+        callback = M.clear_virtual_text,
     })
 
     vim.api.nvim_create_autocmd("ColorScheme", {

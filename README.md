@@ -35,10 +35,11 @@ Install via your favorite package manager:
 ## 🔧 Quick configuration reference
 
 #### Default (important fields)
+
 ```lua
 ---@class ActionHintsTemplateEntry
 ---@field text string
----@field color string|nil
+---@field color string|function|nil
 ---@field link string|nil
 
 ---@class ActionHintsConfigTemplate
@@ -56,12 +57,12 @@ Install via your favorite package manager:
     template = {
         definition = {
             text = " ⊛%s",
-            color = nil,
+            color = require("action-hints").get_fg_color("LspReferenceWrite"),
             link = "Typedef",
         },
         references = {
             text = " ↱%s",
-            color = nil,
+            color = require("action-hints").get_fg_color("LspReferenceRead"),
             link = "Type",
         },
     },
@@ -73,16 +74,25 @@ Install via your favorite package manager:
 
 #### How it works
 
-- 🎨 Priority: if `template.*.color` is set → plugin applies that hex as `fg`.
+- 🎨 **Priority**: if `template.*.color` is set → plugin applies that hex as `fg`.
 - 🔗 Otherwise → plugin applies `{ link = template.*.link }` (default config always provides a link).
-- ⚡ No extra heuristics: "color" wins, otherwise "link".
+- 🧩 **Function support**: `template.*.color` can be a function that returns a hex color. This allows dynamically fetching colors from existing highlight groups.
+- 🔄 **Fallback chain**:
+  1. If `color` is a function → call it to get hex
+  2. If function returns a valid hex → use it as `fg`
+  3. If function returns `nil` or `color` is not set → use `link`
+- 🎯 **Default configuration** uses functions to fetch colors from built-in LSP highlight groups:
+  - `definition.color` tries `LspReferenceWrite` (definition highlight)
+  - `references.color` tries `LspReferenceRead` (reference highlight)
+  - If these groups don't exist, falls back to `Typedef` and `Type` links
+- ⚡ No extra heuristics: color (function result) wins, otherwise link.
 
 #### Fields
 
-- template.definition / template.references
+- `template.definition` / `template.references`
   - `text` — format for virtual text.
-  - `color` — `"#rrggbb"` or `nil`. If set, this fixed color is used.
-  - `link` — hl group name (e.g. `"Typedef"`, `"Type"`) used when `color` is `nil`.
+  - `color` — `"#rrggbb"`, function, or `nil`. If set to a string, this fixed color is used. If set to a function, it is called to obtain a hex color (useful for dynamic colors from existing highlight groups). If function returns `nil` or color is not set, falls back to `link`.
+  - `link` — hl group name (e.g. `"Typedef"`, `"Type"`) used when `color` is `nil` or function returns `nil`.
 - `ignored` — list of patterns/items to ignore.
 - `use_virtual_text` — show virtual text (true/false).
 - `statusline_colored` — if true, statusline groups link to main plugin groups.
@@ -91,6 +101,7 @@ Install via your favorite package manager:
 
 - Force a color:
   - `template.definition.color = "#AF0000"` → plugin applies `fg = "#AF0000"` and respects it across theme changes.
+
 ```lua
 {
     template = {
@@ -107,6 +118,7 @@ Install via your favorite package manager:
 
 - Theme-controlled (recommended default):
   - `template.definition.color = nil; template.definition.link = "Typedef"` → plugin links to `"Typedef"`, so the colorscheme decides the color.
+
 ```lua
 {
     template = {
@@ -119,6 +131,7 @@ Install via your favorite package manager:
     },
 }
 ```
+
 - Ignored:
     - `ignored` field accepts Lua patterns (not shell globs). Patterns are matched against file paths (relative or absolute) — use `^` / `$` anchors, `.` and `*` for "any char" / "repeat", and escape special characters with `%` (e.g. `.` → `%.`).
 
@@ -135,15 +148,28 @@ Install via your favorite package manager:
 
 ## 🚀 Lualine status
 
-Lualine and other statusline frameworks will respect these markers and apply the highlight groups accordingly.
+[Lualine](https://github.com/nvim-lualine/lualine.nvim) and other statusline frameworks will respect these markers and apply the highlight groups accordingly.
 As a lualine component:
 
+**[lazy.nvim](https://github.com/folke/lazy.nvim)**
+
 ```lua
-require("lualine").setup({
-    sections = {
-        lualine_x = { require("action-hints").statusline },
+{
+    "nvim-lualine/lualine.nvim",
+    dependencies = {
+        {
+            "yorik1984/action-hints.nvim",
+            opts = {},
+        },
     },
-})
+    opts = {
+        sections = {
+            lualine_x = { require("action-hints").statusline },
+        },
+        -- other settings
+        ...
+    },
+}
 ```
 
 ## Commands
@@ -158,7 +184,7 @@ Optionally add user keymap:
 vim.keymap.set("n", "<leader>aa", ":ChangeActionHintsStat<CR>", { noremap = true })
 ```
 
-## 🎨✨ Highlight groups
+## 🎨 Highlight groups
 
 Quick reference for the highlight groups used by the plugin.
 
@@ -186,7 +212,7 @@ Quick reference for the highlight groups used by the plugin.
 > - ⚡ Priority rule: `color` (if provided) overrides `link`. If `color == nil` the plugin uses the configured `link` so the active colorscheme controls appearance.
 > - 🖥️ Statusline groups exist to keep statusline visuals consistent and optionally decoupled from virt_text groups.
 
-Examples of how to set or change these highlight groups in your config or `init.lua`:
+### Examples of how to set or change these highlight groups in your config or `init.lua`:
 
 - Set highlight groups directly (hex color):
 
@@ -209,13 +235,18 @@ vim.api.nvim_set_hl(0, "ActionHintsDefinition", { fg = require("action-hints").g
 vim.api.nvim_set_hl(0, "ActionHintsReferences", { fg = require("action-hints").get_fg_color("Type") })
 ```
 
-> [!tip]
-> To make the icons and the words use the same highlighting(like in screenshot), configure your colorscheme so those highlight groups use the same colors. For example:
-```lua
-vim.api.nvim_set_hl(0, "LspReferenceRead",  { link = "ActionHintsReferences", default = false })
-vim.api.nvim_set_hl(0, "LspReferenceWrite", { link = "ActionHintsDefinition", default = false })
-```
+> [!Note]
+> By default, the plugin automatically fetches colors from LSP highlight groups:
+> - Definitions use `LspReferenceWrite`
+> - References use `LspReferenceRead`
+>
+> No additional configuration is needed — the plugin handles this automatically. The icons will inherit the same colors as LSP highlights.
+
+## 🔗 Similar Projects
+
+- [doc-highlight.nvim](https://github.com/allworldg/doc-highlight) – A neovim plugin for LSP Document Highlight
 
 ## ©️ Credits
+ 
 - [roobert/action-hints.nvim](https://github.com/roobert/action-hints.nvim)(original)
 - [lgh597/action-hints.nvim](https://github.com/lgh597/action-hints.nvim)
